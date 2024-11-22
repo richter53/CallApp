@@ -33,6 +33,41 @@ body {
 
 }
 
+/* Style for the video wrapper */
+.video-wrapper {
+    position: relative;
+    display: inline-block; /* So buttons stay in place relative to the video */
+}
+
+/* Hide the controls by default */
+.video-controls {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    display: none; /* Hide the controls by default */
+    z-index: 10;
+}
+
+/* Show the controls on hover */
+.video-wrapper:hover .video-controls {
+    display: block; /* Show controls when video is hovered */
+}
+
+/* Style the buttons */
+.video-controls .btn {
+    margin: 5px;
+    padding: 5px 10px;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+.video-controls .btn:hover {
+    background-color: rgba(0, 0, 0, 0.9);
+}
+
+
 #answer{
     
 }
