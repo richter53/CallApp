@@ -1,3 +1,10 @@
+body {
+    background-color: grey; /* Sets the whole page background to grey */
+    margin: 0; /* Removes default margin */
+    padding: 0; /* Removes default padding */
+}
+
+
 #videos{
     display: grid;
     grid-template-columns: 1fr 1fr;

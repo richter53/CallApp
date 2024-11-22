@@ -31,3 +31,8 @@ function createOfferEls(offers){
         answerEl.appendChild(newOfferEl);
     })
 }
+
+socket.on('hangup', () => {
+    console.log("The other user has ended the call.");
+    hangupCall(); // End the call locally if the other user hangs up
+});

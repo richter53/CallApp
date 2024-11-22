@@ -3,7 +3,7 @@ const password = "x";
 document.querySelector('#user-name').innerHTML = userName;
 
 //if trying it on a phone, use this instead...
-const socket = io.connect('https://147.175.176.81:8181/',{
+const socket = io.connect('https://85.216.233.229:8181/',{
 //const socket = io.connect('https://localhost:8181/',{
     auth: {
         userName,password
@@ -152,5 +152,33 @@ const addNewIceCandidate = iceCandidate=>{
     console.log("======Added Ice Candidate======")
 }
 
+const hangupCall = () => {
+    if (peerConnection) {
+        // Close the peer connection
+        peerConnection.close();
+        peerConnection = null;
+        console.log("Call ended, peer connection closed.");
+    }
+
+    if (localStream) {
+        // Stop all tracks in the local stream
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+        console.log("Local video stream stopped.");
+    }
+
+    // Clear the video elements
+    localVideoEl.srcObject = null;
+    remoteVideoEl.srcObject = null;
+
+    // Notify the signaling server (optional, depends on server-side logic)
+    socket.emit('hangup', { userName });
+};
+
 
 document.querySelector('#call').addEventListener('click',call)
+
+document.querySelector('#hangup').addEventListener('click', () => {
+    console.log("Hangup button clicked"); // Debug log
+    hangupCall();
+});
