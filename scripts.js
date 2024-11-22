@@ -176,35 +176,6 @@ const hangupCall = () => {
 };
 
 
-// Function to toggle mute/unmute
-function toggleMute() {
-    const videoElement = document.querySelector('#my-video');
-    if (videoElement.muted) {
-        videoElement.muted = false;
-    } else {
-        videoElement.muted = true;
-    }
-}
-
-// Function to toggle camera on/off
-function toggleCamera() {
-    const videoElement = document.querySelector('#my-video');
-    const stream = videoElement.srcObject;
-    const tracks = stream.getTracks();
-
-    tracks.forEach(track => {
-        if (track.kind === 'video') {
-            track.enabled = !track.enabled; // Toggle the camera
-        }
-    });
-}
-
-
-
-
 document.querySelector('#call').addEventListener('click',call)
 
-document.querySelector('#hangup').addEventListener('click', () => {
-    console.log("Hangup button clicked"); // Debug log
-    hangupCall();
-});
+document.querySelector('#hangup').addEventListener('click', hangupCall);
