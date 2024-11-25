@@ -1,4 +1,5 @@
 
+
 const fs = require('fs');
 const https = require('https')
 const express = require('express');
@@ -56,7 +57,7 @@ io.on('connection',(socket)=>{
     })
 
     //a new client has joined. If there are any offers available,
-    //emit them out
+    //emit them outa
     if(offers.length){
         socket.emit('availableOffers',offers);
     }

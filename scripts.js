@@ -91,20 +91,24 @@ const fetchUserMedia = () => {
             // Set the local video element's source to the local stream
             localVideoEl.srcObject = stream;
 
-            // Store the stream in the localStream variable
-            localStream = stream;
+            // Mute the local video element to avoid hearing own audio
+            localVideoEl.muted = true;
 
-            // Mute the local audio to prevent it from playing back through your speakers
+            // Disable audio output on the local audio tracks
             const audioTracks = stream.getAudioTracks();
-            audioTracks.forEach(track => track.enabled = false);  // Disable local audio playback
+            audioTracks.forEach(track => track.enabled = false);
+
+            // Store the local stream for future use
+            localStream = stream;
 
             resolve();  // Resolve the promise when successful
         } catch (err) {
-            console.log('Error accessing media devices:', err);
+            console.error('Error accessing media devices:', err);
             reject();  // Reject the promise if an error occurs
         }
     });
-}; 
+};
+
 
 
 const createPeerConnection = (offerObj)=>{
@@ -289,7 +293,7 @@ shareScreenButton.addEventListener('click', toggleScreenSharing);
 
 // AUDIO 
 // Initialize a flag to track mute state
-let isAudioMuted = true;
+let isAudioMuted = false;
 
 // Reference the button element
 const toggleAudioButton = document.querySelector('#toggle-audio');
