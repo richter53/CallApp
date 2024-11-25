@@ -1,9 +1,12 @@
 const userName = "Rob-"+Math.floor(Math.random() * 100000)
 const password = "x";
-document.querySelector('#user-name').innerHTML = userName;
+document.querySelectorAll('.user-name').forEach(div => {
+    div.textContent = userName;
+  });
+
 
 //if trying it on a phone, use this instead...
-const socket = io.connect('https://85.216.233.229:8181/',{
+const socket = io.connect('https://147.175.176.81:8181/',{
 //const socket = io.connect('https://localhost:8181/',{
     auth: {
         userName,password
@@ -77,23 +80,32 @@ const addAnswer = async(offerObj)=>{
     await peerConnection.setRemoteDescription(offerObj.answer)
     // console.log(peerConnection.signalingState)
 }
-
-const fetchUserMedia = ()=>{
-    return new Promise(async(resolve, reject)=>{
-        try{
+const fetchUserMedia = () => {
+    return new Promise(async (resolve, reject) => {
+        try {
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: true,
-                // audio: true,
+                audio: true, // Enable audio
             });
+
+            // Set the local video element's source to the local stream
             localVideoEl.srcObject = stream;
-            localStream = stream;    
-            resolve();    
-        }catch(err){
-            console.log(err);
-            reject()
+
+            // Store the stream in the localStream variable
+            localStream = stream;
+
+            // Mute the local audio to prevent it from playing back through your speakers
+            const audioTracks = stream.getAudioTracks();
+            audioTracks.forEach(track => track.enabled = false);  // Disable local audio playback
+
+            resolve();  // Resolve the promise when successful
+        } catch (err) {
+            console.log('Error accessing media devices:', err);
+            reject();  // Reject the promise if an error occurs
         }
-    })
-}
+    });
+}; 
+
 
 const createPeerConnection = (offerObj)=>{
     return new Promise(async(resolve, reject)=>{
@@ -174,6 +186,136 @@ const hangupCall = () => {
     // Notify the signaling server (optional, depends on server-side logic)
     socket.emit('hangup', { userName });
 };
+
+// Initialize a flag to track the camera state
+let isCameraOff = true;
+
+// Reference the button element for toggling the camera
+const toggleCameraButton = document.querySelector('#toggle-camera');
+
+// Function to toggle the camera
+const toggleCamera = () => {
+    if (localStream) {
+        localStream.getVideoTracks().forEach(track => {
+            track.enabled = !isCameraOff; // Toggle the enabled state
+        });
+    }
+
+    // Toggle the camera state
+    isCameraOff = !isCameraOff;
+
+    // Update the button text immediately after toggling
+    toggleCameraButton.textContent = isCameraOff ? 'Turn Camera Off' : 'Turn Camera On';
+
+    console.log(`Camera is now ${isCameraOff ? 'off' : 'on'}.`);
+};
+
+// Set the initial button text to match the current camera state
+toggleCameraButton.textContent = isCameraOff ? 'Turn Camera Off' : 'Turn Camera On';
+
+// Event listener for the toggle camera button
+toggleCameraButton.addEventListener('click', toggleCamera);
+
+
+//SCREEN SHARING
+let screenStream = null; // To store the screen-sharing stream
+
+// Reference the screen sharing button
+const shareScreenButton = document.querySelector('#share-screen');
+
+// Function to start/stop screen sharing
+const toggleScreenSharing = async () => {
+    if (!screenStream) {
+        try {
+            // Start screen sharing
+            screenStream = await navigator.mediaDevices.getDisplayMedia({
+                video: true,
+                audio: false, // Audio can be included if needed
+            });
+
+            // Replace the video track in the peer connection if it exists
+            if (peerConnection && localStream) {
+                const videoTrack = screenStream.getVideoTracks()[0];
+                const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
+                if (sender) {
+                    sender.replaceTrack(videoTrack); // Replace the local video track with the screen-sharing track
+                }
+            }
+
+            // Display the screen-sharing stream locally
+            localVideoEl.srcObject = screenStream;
+
+            // Listen for when the user stops screen sharing
+            screenStream.getVideoTracks()[0].addEventListener('ended', () => {
+                stopScreenSharing();
+            });
+
+            shareScreenButton.textContent = 'Stop Sharing';
+            console.log('Screen sharing started');
+        } catch (err) {
+            console.error('Error starting screen sharing:', err);
+        }
+    } else {
+        // Stop screen sharing
+        stopScreenSharing();
+    }
+};
+
+// Function to stop screen sharing
+const stopScreenSharing = () => {
+    if (screenStream) {
+        screenStream.getTracks().forEach(track => track.stop()); // Stop all tracks
+        screenStream = null;
+
+        // Revert to the local video stream
+        if (peerConnection && localStream) {
+            const videoTrack = localStream.getVideoTracks()[0];
+            const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
+            if (sender) {
+                sender.replaceTrack(videoTrack); // Replace the screen-sharing track with the local video track
+            }
+        }
+
+        // Display the local video stream
+        localVideoEl.srcObject = localStream;
+
+        shareScreenButton.textContent = 'Share Screen';
+        console.log('Screen sharing stopped');
+    }
+};
+
+// Add event listener to the button
+shareScreenButton.addEventListener('click', toggleScreenSharing);
+
+// AUDIO 
+// Initialize a flag to track mute state
+let isAudioMuted = true;
+
+// Reference the button element
+const toggleAudioButton = document.querySelector('#toggle-audio');
+
+// Function to toggle audio
+const toggleAudio = () => {
+    if (localStream) {
+        localStream.getAudioTracks().forEach(track => {
+            track.enabled = !isAudioMuted; // Toggle the enabled state
+        });
+    }
+
+    // Toggle the mute state
+    isAudioMuted = !isAudioMuted;
+
+    // Update the button text immediately after toggling
+    toggleAudioButton.textContent = isAudioMuted ? 'Mute Audio' : 'Unmute Audio';
+
+    console.log(`Audio is now ${isAudioMuted ? 'muted' : 'unmuted'}.`);
+};
+
+// Set the initial button text to match the current audio state
+toggleAudioButton.textContent = isAudioMuted ? 'Mute Audio' : 'Unmute Audio';
+
+// Event listener for the toggle button
+toggleAudioButton.addEventListener('click', toggleAudio);
 
 
 document.querySelector('#call').addEventListener('click',call)
