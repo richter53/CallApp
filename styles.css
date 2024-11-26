@@ -4,23 +4,22 @@ body {
     padding: 0; /* Removes default padding */
 }
 
-
-#videos{
+#videos {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 2em;
 }
 
-.video-player{
+.video-player {
     background-color: black;
     width: 100%;
 }
 
-#video-wrapper{
+#video-wrapper {
     position: relative;
 }
 
-#waiting{
+#waiting {
     display: none;
     position: absolute;
     left: 0;
@@ -30,11 +29,73 @@ body {
     margin: auto;
     width: 240px;
     height: 40px;
-
 }
 
+/* Control bar styling */
+.control-bar {
+    background-color: #000; /* Solid black background */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1em; /* Space between buttons */
+    padding: 1em; /* Padding inside the control bar */
+    border-radius: 8px; /* Rounded edges */
+    margin-top: 1em; /* Space above the control bar */
+    position: relative; /* Ensure it's placed after videos */
+    width: 100%; /* Full width of the container */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5); /* Add subtle shadow for emphasis */
+}
 
+/* Button styles in the control bar */
+.control-bar button {
+    font-size: 1.5rem; /* Larger button icons */
+    border-radius: 50%; /* Round buttons */
+    padding: 1rem; /* Space inside buttons */
+    border: none; /* Remove default button border */
+    cursor: pointer; /* Pointer cursor on hover */
+    transition: transform 0.2s ease; /* Smooth animation */
+}
 
-#answer{
-    
+/* Button hover effect */
+.control-bar button:hover {
+    transform: scale(1.2); /* Slight zoom effect on hover */
+}
+
+/* Custom icon styling */
+.custom-icon {
+    width: 24px; /* Icon size */
+    height: 24px; /* Icon size */
+    object-fit: contain; /* Maintain aspect ratio */
+    display: block;
+    margin: 0 auto; /* Center the icon within the button */
+}
+
+/* Microphone button styles */
+.custom-mic {
+    cursor: pointer;
+    width: 90px; /* Size of microphone button */
+    height: 90px;
+    transition: transform 0.2s ease; /* Smooth hover animation */
+}
+
+/* Camera button styles */
+.custom-camera {
+    cursor: pointer;
+    width: 70px; /* Size of camera button */
+    height: 70px;
+    transition: transform 0.2s ease; /* Smooth hover animation */
+}
+
+/* Hover effect for custom icons */
+.control-bar button:hover .custom-icon {
+    transform: scale(1.2); /* Slight zoom on hover */
+    transition: transform 0.2s ease;
+}
+
+/* Button base styles for consistent sizing */
+button {
+    width: 70px; /* Button size */
+    height: 70px;
+    background: transparent;
+    border: none;
 }

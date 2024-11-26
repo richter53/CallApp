@@ -39,13 +39,15 @@ const createRemoteVideoElement = (peerUserName) => {
     if (assignedRemoteVideos[peerUserName]) {
         return assignedRemoteVideos[peerUserName];
     }
-
+    /*const videoWr = document.createElement('div');
+    videoWr.id = 'video-wrapper';*/
     const videoEl = document.createElement('video');
     videoEl.id = `remote-video-${peerUserName}`;
     videoEl.className = 'video-player';
     videoEl.autoplay = true;
     videoEl.playsInline = true;
     remoteVideosContainer.appendChild(videoEl);
+    //videoWr.appendChild(videoEl);
 
     assignedRemoteVideos[peerUserName] = videoEl;
     return videoEl;
@@ -211,10 +213,17 @@ document.querySelector('#hangup').addEventListener('click', hangupCall);
 //kokotiny
 
 // Initialize a flag to track the camera state
+// Initialize a flag to track the camera state
 let isCameraOff = true;
 
-// Reference the button element for toggling the camera
-const toggleCameraButton = document.querySelector('#toggle-camera');
+// Create an image element to act as the camera toggle button
+const toggleCameraButton = document.createElement('img');
+toggleCameraButton.src = isCameraOff ? '/icons/camera-off.png' : '/icons/camera-on.png'; // Path to camera icons
+toggleCameraButton.alt = isCameraOff ? 'Turn Camera On' : 'Turn Camera Off';
+toggleCameraButton.className = 'custom-camera'; // Add a class for styling
+
+// Append the image button to the DOM (ensure you have a container for it)
+document.querySelector('#camera-container').appendChild(toggleCameraButton);
 
 // Function to toggle the camera
 const toggleCamera = () => {
@@ -227,56 +236,54 @@ const toggleCamera = () => {
     // Toggle the camera state
     isCameraOff = !isCameraOff;
 
-    // Update the button text immediately after toggling
-    toggleCameraButton.textContent = isCameraOff ? 'Turn Camera Off' : 'Turn Camera On';
+    // Update the image source and alt text
+    toggleCameraButton.src = isCameraOff ? '/icons/cam-on.png' : '/icons/cam-off.png';
+    toggleCameraButton.alt = isCameraOff ? 'Turn Camera On' : 'Turn Camera Off';
 
     console.log(`Camera is now ${isCameraOff ? 'off' : 'on'}.`);
 };
 
-// Set the initial button text to match the current camera state
-toggleCameraButton.textContent = isCameraOff ? 'Turn Camera Off' : 'Turn Camera On';
-
-// Event listener for the toggle camera button
+// Add event listener to the image button
 toggleCameraButton.addEventListener('click', toggleCamera);
 
+// Set the initial image state
+toggleCameraButton.src = isCameraOff ? '/icons/cam-on.png' : '/icons/cam-off.png';
+toggleCameraButton.alt = isCameraOff ? 'Turn Camera On' : 'Turn Camera Off';
 
-//SCREEN SHARING
 let screenStream = null; // To store the screen-sharing stream
+const shareScreenButton = document.querySelector('#share-screen'); // Screen sharing button
 
-// Reference the screen sharing button
-const shareScreenButton = document.querySelector('#share-screen');
-
-// Function to start/stop screen sharing
+// Function to toggle screen sharing
 const toggleScreenSharing = async () => {
     if (!screenStream) {
         try {
             // Start screen sharing
-            screenStream = await navigator.mediaDevices.getDisplayMedia({
-                video: true,
-                audio: false, // Audio can be included if needed
-            });
+            screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
 
-            // Replace the video track in the peer connection if it exists
-            if (peerConnection && localStream) {
-                const videoTrack = screenStream.getVideoTracks()[0];
-                const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
+            // Replace the video track in all peer connections
+            const screenVideoTrack = screenStream.getVideoTracks()[0];
+            for (const peerUserName in peerConnections) {
+                const sender = peerConnections[peerUserName]
+                    .getSenders()
+                    .find(sender => sender.track && sender.track.kind === 'video');
                 if (sender) {
-                    sender.replaceTrack(videoTrack); // Replace the local video track with the screen-sharing track
+                    sender.replaceTrack(screenVideoTrack);
                 }
             }
 
             // Display the screen-sharing stream locally
             localVideoEl.srcObject = screenStream;
 
-            // Listen for when the user stops screen sharing
-            screenStream.getVideoTracks()[0].addEventListener('ended', () => {
+            // Listen for when the user stops sharing the screen
+            screenVideoTrack.addEventListener('ended', () => {
+                console.log('Screen sharing ended by user.');
                 stopScreenSharing();
             });
 
             shareScreenButton.textContent = 'Stop Sharing';
-            console.log('Screen sharing started');
-        } catch (err) {
-            console.error('Error starting screen sharing:', err);
+            console.log('Screen sharing started.');
+        } catch (error) {
+            console.error('Error starting screen sharing:', error);
         }
     } else {
         // Stop screen sharing
@@ -290,12 +297,14 @@ const stopScreenSharing = () => {
         screenStream.getTracks().forEach(track => track.stop()); // Stop all tracks
         screenStream = null;
 
-        // Revert to the local video stream
-        if (peerConnection && localStream) {
-            const videoTrack = localStream.getVideoTracks()[0];
-            const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
+        // Replace the video track in all peer connections with the local video stream
+        const localVideoTrack = localStream.getVideoTracks()[0];
+        for (const peerUserName in peerConnections) {
+            const sender = peerConnections[peerUserName]
+                .getSenders()
+                .find(sender => sender.track && sender.track.kind === 'video');
             if (sender) {
-                sender.replaceTrack(videoTrack); // Replace the screen-sharing track with the local video track
+                sender.replaceTrack(localVideoTrack);
             }
         }
 
@@ -303,19 +312,25 @@ const stopScreenSharing = () => {
         localVideoEl.srcObject = localStream;
 
         shareScreenButton.textContent = 'Share Screen';
-        console.log('Screen sharing stopped');
+        console.log('Screen sharing stopped.');
     }
 };
 
-// Add event listener to the button
+// Add an event listener for the share screen button
 shareScreenButton.addEventListener('click', toggleScreenSharing);
 
 // AUDIO 
 // Initialize a flag to track mute state
 let isAudioMuted = true;
 
-// Reference the button element
-const toggleAudioButton = document.querySelector('#toggle-audio');
+// Reference the image element (button) for toggling audio
+const toggleAudioButton = document.createElement('img');
+toggleAudioButton.src = '/icons/mic-off.png'; // Path to muted microphone icon
+toggleAudioButton.alt = 'Mute Audio';
+toggleAudioButton.className = 'custom-mic'; // Add a class for styling
+
+// Append the image button to the DOM (ensure you have a container for it)
+document.querySelector('#audio-container').appendChild(toggleAudioButton);
 
 // Function to toggle audio
 const toggleAudio = () => {
@@ -328,18 +343,16 @@ const toggleAudio = () => {
     // Toggle the mute state
     isAudioMuted = !isAudioMuted;
 
-    // Update the button text immediately after toggling
-    toggleAudioButton.textContent = isAudioMuted ? 'Mute Audio' : 'Unmute Audio';
+    // Update the image source and alt text
+    toggleAudioButton.src = isAudioMuted ? '/icons/mic-on.png' : '/icons/mic-off.png';
+    toggleAudioButton.alt = isAudioMuted ? 'Unmute Audio' : 'Mute Audio';
 
     console.log(`Audio is now ${isAudioMuted ? 'muted' : 'unmuted'}.`);
 };
 
-// Set the initial button text to match the current audio state
-toggleAudioButton.textContent = isAudioMuted ? 'Mute Audio' : 'Unmute Audio';
-
-// Event listener for the toggle button
+// Add event listener to the image button
 toggleAudioButton.addEventListener('click', toggleAudio);
 
-
-
-
+// Set the initial image state
+toggleAudioButton.src = isAudioMuted ? '/icons/mic-on.png' : '/icons/mic-off.png';
+toggleAudioButton.alt = isAudioMuted ? 'Unmute Audio' : 'Mute Audio';
