@@ -1,195 +1,214 @@
-const userName = "Rob-"+Math.floor(Math.random() * 100000)
-const password = "x";
+const userName = "User-" + Math.floor(Math.random() * 100000); // Unique username for each client
+const password = "x"; // Authentication password
 document.querySelectorAll('.user-name').forEach(div => {
     div.textContent = userName;
-  });
+});
 
-
-//if trying it on a phone, use this instead...
-const socket = io.connect('https://147.175.176.81:8181/',{
-//const socket = io.connect('https://localhost:8181/',{
-    auth: {
-        userName,password
-    }
-})
+// Socket connection
+const socket = io.connect('https://147.175.176.81:8181/', {
+    auth: { userName, password }
+});
 
 const localVideoEl = document.querySelector('#local-video');
-const remoteVideoEl = document.querySelector('#remote-video');
+const remoteVideosContainer = document.querySelector('#videos'); // Container for remote video elements
+const assignedRemoteVideos = {}; // Map of peerUserName to dynamically created video elements
 
-let localStream; //a var to hold the local video stream
-let remoteStream; //a var to hold the remote video stream
-let peerConnection; //the peerConnection that the two clients use to talk
-let didIOffer = false;
+let localStream; // Local media stream
+let userList = []; // List of all participants
+const peerConnections = {}; // Active connections by peerUserName
 
-let peerConfiguration = {
-    iceServers:[
-        {
-            urls:[
-              'stun:stun.l.google.com:19302',
-              'stun:stun1.l.google.com:19302'
-            ]
+// STUN server configuration
+const peerConfiguration = {
+    iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }]
+};
+
+// Fetch user media for local stream
+const fetchUserMedia = async () => {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        localVideoEl.srcObject = stream;
+        localStream = stream;
+        console.log("Local stream fetched.");
+    } catch (err) {
+        console.error("Error accessing media devices:", err);
+    }
+};
+
+// Dynamically create a new video element for a remote participant
+const createRemoteVideoElement = (peerUserName) => {
+    if (assignedRemoteVideos[peerUserName]) {
+        return assignedRemoteVideos[peerUserName];
+    }
+
+    const videoEl = document.createElement('video');
+    videoEl.id = `remote-video-${peerUserName}`;
+    videoEl.className = 'video-player';
+    videoEl.autoplay = true;
+    videoEl.playsInline = true;
+    remoteVideosContainer.appendChild(videoEl);
+
+    assignedRemoteVideos[peerUserName] = videoEl;
+    return videoEl;
+};
+const createPeerConnection = (peerUserName) => {
+    console.log(`Creating peer connection for ${peerUserName}`);
+    const peerConnection = new RTCPeerConnection(peerConfiguration);
+    const remoteStream = new MediaStream();
+    const videoEl = createRemoteVideoElement(peerUserName);
+
+    videoEl.srcObject = remoteStream;
+
+    peerConnections[peerUserName] = peerConnection;
+
+    // Add local stream tracks
+    localStream.getTracks().forEach(track => {
+        console.log(`Adding local track for ${peerUserName}`);
+        peerConnection.addTrack(track, localStream);
+    });
+
+    // Handle incoming remote tracks
+    peerConnection.ontrack = (event) => {
+        console.log(`Received track for ${peerUserName}`);
+        event.streams[0].getTracks().forEach(track => {
+            console.log(`Adding remote track for ${peerUserName}`);
+            remoteStream.addTrack(track);
+        });
+    };
+
+    // Handle ICE candidates
+    peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+            console.log(`Sending ICE candidate for ${peerUserName}`);
+            socket.emit('sendIceCandidateToSignalingServer', {
+                iceCandidate: event.candidate,
+                peerUserName: peerUserName
+            });
         }
-    ]
-}
+    };
 
-//when a client initiates a call
-const call = async e=>{
+    return peerConnection;
+};
+
+socket.on('userList', (users) => {
+    userList = users.filter((user) => user !== userName);
+    console.log("Updated user list:", userList);
+});
+
+
+
+
+// Initiate a call with all participants
+const call = async () => {
     await fetchUserMedia();
 
-    //peerConnection is all set with our STUN servers sent over
-    await createPeerConnection();
+    for (const participant of userList) {
+        if (!peerConnections[participant]) {
+            const peerConnection = createPeerConnection(participant);
+            if (!peerConnection) continue;
 
-    //create offer time!
-    try{
-        console.log("Creating offer...")
-        const offer = await peerConnection.createOffer();
-        console.log(offer);
-        peerConnection.setLocalDescription(offer);
-        didIOffer = true;
-        socket.emit('newOffer',offer); //send offer to signalingServer
-    }catch(err){
-        console.log(err)
-    }
+            try {
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
 
-}
-
-const answerOffer = async(offerObj)=>{
-    await fetchUserMedia()
-    await createPeerConnection(offerObj);
-    const answer = await peerConnection.createAnswer({}); //just to make the docs happy
-    await peerConnection.setLocalDescription(answer); //this is CLIENT2, and CLIENT2 uses the answer as the localDesc
-    console.log(offerObj)
-    console.log(answer)
-    // console.log(peerConnection.signalingState) //should be have-local-pranswer because CLIENT2 has set its local desc to it's answer (but it won't be)
-    //add the answer to the offerObj so the server knows which offer this is related to
-    offerObj.answer = answer 
-    //emit the answer to the signaling server, so it can emit to CLIENT1
-    //expect a response from the server with the already existing ICE candidates
-    const offerIceCandidates = await socket.emitWithAck('newAnswer',offerObj)
-    offerIceCandidates.forEach(c=>{
-        peerConnection.addIceCandidate(c);
-        console.log("======Added Ice Candidate======")
-    })
-    console.log(offerIceCandidates)
-}
-
-const addAnswer = async(offerObj)=>{
-    //addAnswer is called in socketListeners when an answerResponse is emitted.
-    //at this point, the offer and answer have been exchanged!
-    //now CLIENT1 needs to set the remote
-    await peerConnection.setRemoteDescription(offerObj.answer)
-    // console.log(peerConnection.signalingState)
-}
-const fetchUserMedia = () => {
-    return new Promise(async (resolve, reject) => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: true,
-                audio: true, // Enable audio
-            });
-
-            // Set the local video element's source to the local stream
-            localVideoEl.srcObject = stream;
-
-            // Mute the local video element to avoid hearing own audio
-            localVideoEl.muted = true;
-
-            // Disable audio output on the local audio tracks
-            const audioTracks = stream.getAudioTracks();
-            audioTracks.forEach(track => track.enabled = false);
-
-            // Store the local stream for future use
-            localStream = stream;
-
-            resolve();  // Resolve the promise when successful
-        } catch (err) {
-            console.error('Error accessing media devices:', err);
-            reject();  // Reject the promise if an error occurs
+                console.log(`Sending offer to ${participant}`);
+                socket.emit('newOffer', { offer, targetUser: participant });
+            } catch (err) {
+                console.error("Error creating offer:", err);
+            }
         }
-    });
+    }
 };
 
+// Handle incoming offer
 
+socket.on('incomingOffer', async (offerObj) => {
+    const peerUserName = offerObj.from;
 
-const createPeerConnection = (offerObj)=>{
-    return new Promise(async(resolve, reject)=>{
-        //RTCPeerConnection is the thing that creates the connection
-        //we can pass a config object, and that config object can contain stun servers
-        //which will fetch us ICE candidates
-        peerConnection = await new RTCPeerConnection(peerConfiguration)
-        remoteStream = new MediaStream()
-        remoteVideoEl.srcObject = remoteStream;
+    console.log(`Received offer from ${peerUserName}`);
+    let peerConnection = peerConnections[peerUserName];
 
-
-        localStream.getTracks().forEach(track=>{
-            //add localtracks so that they can be sent once the connection is established
-            peerConnection.addTrack(track,localStream);
-        })
-
-        peerConnection.addEventListener("signalingstatechange", (event) => {
-            console.log(event);
-            console.log(peerConnection.signalingState)
-        });
-
-        peerConnection.addEventListener('icecandidate',e=>{
-            console.log('........Ice candidate found!......')
-            console.log(e)
-            if(e.candidate){
-                socket.emit('sendIceCandidateToSignalingServer',{
-                    iceCandidate: e.candidate,
-                    iceUserName: userName,
-                    didIOffer,
-                })    
-            }
-        })
-        
-        peerConnection.addEventListener('track',e=>{
-            console.log("Got a track from the other peer!! How excting")
-            console.log(e)
-            e.streams[0].getTracks().forEach(track=>{
-                remoteStream.addTrack(track,remoteStream);
-                console.log("Here's an exciting moment... fingers cross")
-            })
-        })
-
-        if(offerObj){
-            //this won't be set when called from call();
-            //will be set when we call from answerOffer()
-            // console.log(peerConnection.signalingState) //should be stable because no setDesc has been run yet
-            await peerConnection.setRemoteDescription(offerObj.offer)
-            // console.log(peerConnection.signalingState) //should be have-remote-offer, because client2 has setRemoteDesc on the offer
-        }
-        resolve();
-    })
-}
-
-const addNewIceCandidate = iceCandidate=>{
-    peerConnection.addIceCandidate(iceCandidate)
-    console.log("======Added Ice Candidate======")
-}
-
-const hangupCall = () => {
-    if (peerConnection) {
-        // Close the peer connection
-        peerConnection.close();
-        peerConnection = null;
-        console.log("Call ended, peer connection closed.");
+    if (!peerConnection) {
+        peerConnection = createPeerConnection(peerUserName);
     }
+
+    try {
+        if (peerConnection.signalingState === 'stable') {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(offerObj.offer));
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+
+            console.log(`Sending answer to ${peerUserName}`);
+            socket.emit('newAnswer', { answer, targetUser: peerUserName });
+        } else {
+            console.error(
+                `Cannot set remote offer for ${peerUserName}. Current signaling state: ${peerConnection.signalingState}`
+            );
+        }
+    } catch (error) {
+        console.error(`Error handling offer from ${peerUserName}:`, error);
+    }
+});
+
+// Handle incoming answer
+
+
+socket.on('incomingAnswer', async (answerObj) => {
+    const peerConnection = peerConnections[answerObj.from];
+
+    if (!peerConnection) {
+        console.error(`No peer connection found for ${answerObj.from}`);
+        return;
+    }
+
+    try {
+        if (peerConnection.signalingState === 'have-local-offer') {
+            console.log(`Received answer from ${answerObj.from}`);
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(answerObj.answer));
+        } else {
+            console.error(
+                `Cannot set remote answer for ${answerObj.from}. Current signaling state: ${peerConnection.signalingState}`
+            );
+        }
+    } catch (error) {
+        console.error(`Error handling answer from ${answerObj.from}:`, error);
+    }
+});
+
+// Handle incoming ICE candidates
+
+socket.on('incomingIceCandidate', (iceCandidateObj) => {
+    const peerConnection = peerConnections[iceCandidateObj.from];
+    if (peerConnection) {
+        console.log(`Adding ICE candidate from ${iceCandidateObj.from}`);
+        peerConnection.addIceCandidate(new RTCIceCandidate(iceCandidateObj.candidate));
+    }
+});
+
+// Hang up the call
+const hangupCall = () => {
+    console.log("Hanging up the call.");
+    Object.values(peerConnections).forEach(conn => conn.close());
+    Object.keys(peerConnections).forEach(key => delete peerConnections[key]);
 
     if (localStream) {
-        // Stop all tracks in the local stream
         localStream.getTracks().forEach(track => track.stop());
         localStream = null;
-        console.log("Local video stream stopped.");
     }
 
-    // Clear the video elements
     localVideoEl.srcObject = null;
-    remoteVideoEl.srcObject = null;
+    Object.keys(assignedRemoteVideos).forEach((key) => {
+        const videoEl = assignedRemoteVideos[key];
+        videoEl.parentElement.removeChild(videoEl); // Remove video element from DOM
+        delete assignedRemoteVideos[key];
+    });
 
-    // Notify the signaling server (optional, depends on server-side logic)
-    socket.emit('hangup', { userName });
+    console.log("Call ended.");
 };
+// Attach event listeners
+document.querySelector('#call').addEventListener('click', call);
+document.querySelector('#hangup').addEventListener('click', hangupCall);
+
+//kokotiny
 
 // Initialize a flag to track the camera state
 let isCameraOff = true;
@@ -293,7 +312,7 @@ shareScreenButton.addEventListener('click', toggleScreenSharing);
 
 // AUDIO 
 // Initialize a flag to track mute state
-let isAudioMuted = false;
+let isAudioMuted = true;
 
 // Reference the button element
 const toggleAudioButton = document.querySelector('#toggle-audio');
@@ -322,6 +341,5 @@ toggleAudioButton.textContent = isAudioMuted ? 'Mute Audio' : 'Unmute Audio';
 toggleAudioButton.addEventListener('click', toggleAudio);
 
 
-document.querySelector('#call').addEventListener('click',call)
 
-document.querySelector('#hangup').addEventListener('click', hangupCall);
+
