@@ -1,3 +1,4 @@
+
 const userName = "User-" + Math.floor(Math.random() * 100000); // Unique username for each client
 const password = "x"; // Authentication password
 document.querySelectorAll('.user-name').forEach(div => {

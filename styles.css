@@ -40,10 +40,13 @@ body {
     gap: 1em; /* Space between buttons */
     padding: 1em; /* Padding inside the control bar */
     border-radius: 8px; /* Rounded edges */
-    margin-top: 1em; /* Space above the control bar */
-    position: relative; /* Ensure it's placed after videos */
+    position: fixed; /* Pin to the bottom of the screen */
+    bottom: 0; /* Align to the bottom of the viewport */
+    left: 0;
+    right: 0;
     width: 100%; /* Full width of the container */
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5); /* Add subtle shadow for emphasis */
+    box-shadow: 0 -4px 8px rgba(0, 0, 0, 0.5); /* Add subtle shadow above the bar */
+    z-index: 1000; /* Ensure it stays above other content */
 }
 
 /* Button styles in the control bar */
